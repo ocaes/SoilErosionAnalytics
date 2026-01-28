@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Soil Erosion Watch – Derived RUSLE Implementation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      --primary: #2f6f4e;
+      --secondary: #f4f7f6;
+      --text: #333;
+      --muted: #666;
+      --border: #e0e0e0;
+      --code-bg: #f0f3f2;
+    }
+
+    body {
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      background: var(--secondary);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 2rem 1.5rem;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.8rem;
+    }
+
+    header p {
+      margin-top: 0.5rem;
+      max-width: 900px;
+      opacity: 0.9;
+    }
+
+    main {
+      max-width: 1000px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    section {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    section h2 {
+      margin-top: 0;
+      color: var(--primary);
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.4rem;
+    }
+
+    section h3 {
+      margin-top: 1.2rem;
+      color: var(--primary);
+    }
+
+    ul {
+      padding-left: 1.2rem;
+    }
+
+    li {
+      margin-bottom: 0.4rem;
+    }
+
+    .equation {
+      background: var(--code-bg);
+      border-left: 4px solid var(--primary);
+      padding: 1rem;
+      margin: 1rem 0;
+      font-family: "Courier New", monospace;
+      font-size: 1rem;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 600px) {
+      header h1 {
+        font-size: 1.4rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Soil Erosion Watch – Derived RUSLE Implementation</h1>
+  <p>
+    Scalable, Google Earth Engine–based soil erosion assessment following the
+    Soil Erosion Watch philosophy for regional decision-support and prioritization.
+  </p>
+</header>
+
+<main>
+
+  <section>
+    <h2>Methods</h2>
+    <p>
+      This application implements a RUSLE-based soil erosion estimation using
+      Google Earth Engine (GEE) for any user-defined location. The core equation
+      follows the adapted <strong>Karydas &amp; Panagos (2018)</strong> formulation:
+    </p>
+
+    <div class="equation">
+      A = R × K × LS / (V × L)
+    </div>
+
+    <ul>
+      <li><strong>A</strong> – Annual soil loss (tons per hectare)</li>
+      <li><strong>R</strong> – Rainfall erosivity derived from CHIRPS daily precipitation</li>
+      <li><strong>K</strong> – Soil erodibility factor from global soil datasets</li>
+      <li><strong>LS</strong> – Topographic factor derived from SRTM slope and flow length</li>
+      <li><strong>V</strong> – Vegetation cover factor from Sentinel-2 NDVI</li>
+      <li><strong>L</strong> – Landscape factor derived using Sobel edge detection on Sentinel-2 NIR (B8)</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Data Sources</h2>
+    <ul>
+      <li><strong>Precipitation:</strong> CHIRPS Daily (UCSB-CHG/CHIRPS/DAILY)</li>
+      <li><strong>Digital Elevation Model:</strong> SRTMGL1 (USGS/SRTMGL1_003)</li>
+      <li><strong>Land Cover / Vegetation:</strong> Sentinel-2 L2A (COPERNICUS/S2_SR_HARMONIZED)</li>
+      <li><strong>Administrative Boundaries:</strong> FAO GAUL 2015 (Level 1 &amp; 2)</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Vegetation Factor (V)</h2>
+    <p>
+      Vegetation cover is used as a proxy for erosion-controlling land cover.
+      NDVI values are transformed exponentially to reflect the inverse relationship
+      between vegetation density and erosion susceptibility.
+    </p>
+    <p class="muted">
+      While the full Soil Erosion Watch method uses monthly harmonized composites
+      and bare soil frequency (BSf), this implementation uses annual median NDVI
+      to approximate temporal vegetation dynamics.
+    </p>
+  </section>
+
+  <section>
+    <h2>Landscape Factor (L)</h2>
+    <p>
+      A Sobel convolution applied to the Sentinel-2 NIR band highlights linear and
+      point landscape features such as hedgerows, terraces, and tree lines that
+      reduce erosion. The result is normalized and incorporated into the
+      denominator of the RUSLE equation.
+    </p>
+  </section>
+
+  <section>
+    <h2>Masking</h2>
+    <p>
+      Impervious surfaces, permanently vegetated areas, and water bodies can be
+      optionally masked to focus analysis on erosion-prone surfaces only.
+    </p>
+  </section>
+
+  <section>
+    <h2>Output Metrics</h2>
+    <div class="grid">
+      <ul>
+        <li><strong>Rate:</strong> Soil erosion intensity (tons/ha/year)</li>
+        <li><strong>Tonnage:</strong> Total soil loss by area</li>
+        <li><strong>Hectares affected:</strong> Area by trend class</li>
+      </ul>
+      <ul>
+        <li><strong>Trend classes:</strong> Improving, Stable, Degrading</li>
+        <li><strong>Ecosystem metrics:</strong> Soil loss by land cover type</li>
+        <li><strong>Land cover classes:</strong> Forest, Shrub, Grass, Crop, Bare</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Limitations and Assumptions</h2>
+    <ol>
+      <li>Simplified vegetation temporal modeling using annual median NDVI</li>
+      <li>Vegetation factor approximates C-factor; class-specific variability exists</li>
+      <li>Sobel-based L-factor captures features at 10 m resolution only</li>
+      <li>Erosion values are relative and intended for prioritization, not field calibration</li>
+      <li>Rainfall erosivity derived from CHIRPS; no I30 intensity metric included</li>
+      <li>Future scenarios are not based on CMIP6 or SSP projections</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Implementation Philosophy</h2>
+    <p>
+      This approach follows the <strong>Soil Erosion Watch</strong> philosophy,
+      providing a transparent, scalable, and reproducible GEE-based tool suitable
+      for regional soil erosion assessment, decision-support, and communication.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  © Soil Erosion Watch – Derived RUSLE Implementation
+</footer>
+
+</body>
+</html>
